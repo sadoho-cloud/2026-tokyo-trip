@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { ITINERARY, CITY_COORDS } from '../constants';
-import { Cloud, Sun, Thermometer, CheckCircle2, MapPin, Snowflake, Droplets, RefreshCcw, Wifi } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CITY_COORDS } from '../constants';
+import { gemini } from '../services/geminiService';
+import { Cloud, Sun, Thermometer, MapPin, Snowflake, Droplets, RefreshCcw, Wifi, CloudRain, CloudLightning, Wind, ChevronRight } from 'lucide-react';
 
 interface RealTimeWeather {
   city: string;
@@ -10,14 +11,30 @@ interface RealTimeWeather {
   humidity: number;
 }
 
+interface ForecastDay {
+  date: string;
+  maxTemp: number;
+  minTemp: number;
+  weatherCode: number;
+  dayName: string;
+}
+
 const WeatherView: React.FC = () => {
   const [liveData, setLiveData] = useState<RealTimeWeather[]>([]);
+  const [forecast, setForecast] = useState<ForecastDay[]>([]);
+  const [aiAdvice, setAiAdvice] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  const fetchLiveWeather = async () => {
+  const getDayName = (dateStr: string) => {
+    const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    return days[new Date(dateStr).getDay()];
+  };
+
+  const fetchWeatherData = useCallback(async () => {
     setLoading(true);
     try {
-      const results = await Promise.all(
+      // 1. 抓取三大城市目前的即時氣溫
+      const liveResults = await Promise.all(
         Object.values(CITY_COORDS).map(async (city) => {
           const res = await fetch(
             `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current_weather=true&relative_humidity_2m=true`
@@ -25,141 +42,144 @@ const WeatherView: React.FC = () => {
           const data = await res.json();
           return {
             city: city.name,
-            temp: data.current_weather.temperature,
+            temp: Math.round(data.current_weather.temperature),
             conditionCode: data.current_weather.weathercode,
-            humidity: data.current_weather.relative_humidity_2m || 0
+            humidity: data.relative_humidity_2m || 0,
           };
         })
       );
-      setLiveData(results);
+      setLiveData(liveResults);
+
+      // 2. 抓取東京未來 7 天的動態預報
+      const forecastRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${CITY_COORDS.tokyo.lat}&longitude=${CITY_COORDS.tokyo.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`
+      );
+      const forecastData = await forecastRes.json();
+      
+      const formattedForecast = forecastData.daily.time.map((time: string, i: number) => ({
+        date: time.split('-').slice(1).join('/'),
+        maxTemp: Math.round(forecastData.daily.temperature_2m_max[i]),
+        minTemp: Math.round(forecastData.daily.temperature_2m_min[i]),
+        weatherCode: forecastData.daily.weathercode[i],
+        dayName: getDayName(time)
+      }));
+      setForecast(formattedForecast);
+
+      // 3. 獲取 AI 旅遊穿著建議
+      const todayForecast = formattedForecast[0];
+      const advice = await gemini.askTravelGuide(`目前東京預報是 ${todayForecast.minTemp}°C - ${todayForecast.maxTemp}°C，天氣代碼為 ${todayForecast.weatherCode}。請給予一段 50 字內的穿著與旅遊建議。`);
+      setAiAdvice(advice.text);
+
     } catch (error) {
-      console.error('Failed to fetch live weather:', error);
+      console.error('Weather Sync Failed:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchLiveWeather();
   }, []);
 
-  const getWeatherIcon = (icon: string | number) => {
-    // Handle Open-Meteo WMO Codes
-    if (typeof icon === 'number') {
-      if (icon === 0) return <Sun className="text-amber-400" size={32} />;
-      if (icon <= 3) return <Cloud className="text-slate-300" size={32} />;
-      if (icon >= 71 && icon <= 77) return <Snowflake className="text-blue-200" size={32} />;
-      if (icon >= 51) return <Droplets className="text-blue-400" size={32} />;
-      return <Cloud className="text-slate-400" size={32} />;
-    }
+  useEffect(() => {
+    fetchWeatherData();
+  }, [fetchWeatherData]);
 
-    // Handle string icons from constants
-    switch (icon) {
-      case 'snow': return <Snowflake className="text-blue-300" size={32} />;
-      case 'rain': return <Droplets className="text-blue-400" size={32} />;
-      case 'cloud': return <Cloud className="text-slate-300" size={32} />;
-      default: return <Sun className="text-amber-400" size={32} />;
-    }
-  };
-
-  const getStaticSuggestion = (title: string) => {
-    if (title.includes('輕井澤')) return "山區溫差大且有雪。建議穿著發熱衣、羊毛衫搭配長版厚羽絨外套。防滑雪靴與手套必備。";
-    if (title.includes('台場') || title.includes('橫濱')) return "海邊風大體感冷。建議穿著防風外套與圍巾。";
-    return "東京冬季乾燥寒冷，建議穿著保暖衣物並注意皮膚保濕。";
+  const getWeatherIcon = (code: number, size: number = 24) => {
+    if (code === 0) return <Sun className="text-amber-400" size={size} />;
+    if (code >= 1 && code <= 3) return <Cloud className="text-slate-300" size={size} />;
+    if (code >= 51 && code <= 67) return <CloudRain className="text-blue-400" size={size} />;
+    if (code >= 71 && code <= 77) return <Snowflake className="text-cyan-200" size={size} />;
+    if (code >= 80 && code <= 82) return <Droplets className="text-blue-500" size={size} />;
+    if (code >= 95) return <CloudLightning className="text-indigo-400" size={size} />;
+    return <Cloud className="text-slate-400" size={size} />;
   };
 
   return (
-    <div className="p-5 space-y-6 pb-24">
-      <header className="flex justify-between items-end">
+    <div className="p-5 space-y-6 pb-24 animate-in fade-in duration-500">
+      <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">氣候資訊</h1>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Real-time Weather Dashboard</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight italic uppercase">Live Weather</h1>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">即時連網氣象預報系統</p>
         </div>
         <button 
-          onClick={fetchLiveWeather} 
+          onClick={fetchWeatherData} 
           disabled={loading}
-          className="p-2 bg-white rounded-full border border-slate-100 shadow-sm active:scale-90 transition-transform"
+          className="p-3 bg-white rounded-2xl border border-slate-100 shadow-sm active:scale-90 transition-all"
         >
-          <RefreshCcw size={14} className={`${loading ? 'animate-spin' : ''} text-slate-400`} />
+          <RefreshCcw size={18} className={`${loading ? 'animate-spin text-red-500' : 'text-slate-400'}`} />
         </button>
       </header>
 
-      {/* 1. 即時日本看板 (無需 Key) */}
-      <section className="space-y-3">
-        <div className="flex items-center space-x-2 px-1">
-          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">日本實況連線</span>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-3">
-          {loading ? (
-            [1, 2, 3].map(i => <div key={i} className="h-28 bg-white rounded-2xl border border-slate-100 animate-pulse"></div>)
-          ) : (
-            liveData.map((data, i) => (
-              <div key={i} className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 mb-2">{data.city}</span>
-                {getWeatherIcon(data.conditionCode)}
-                <span className="text-lg font-black text-slate-900 mt-2">{data.temp}°</span>
-                <span className="text-[8px] font-bold text-slate-300 uppercase">Humidity {data.humidity}%</span>
+      {/* 1. 三大城市現況 */}
+      <section className="grid grid-cols-3 gap-3">
+        {loading ? [1,2,3].map(i => <div key={i} className="h-28 bg-white rounded-3xl animate-pulse border border-slate-50"></div>) : 
+          liveData.map((data, i) => (
+            <div key={i} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
+              <span className="text-[10px] font-black text-slate-400 mb-2 uppercase">{data.city}</span>
+              {getWeatherIcon(data.conditionCode, 28)}
+              <span className="text-xl font-black text-slate-900 mt-2">{data.temp}°</span>
+              <div className="flex items-center mt-1 text-[8px] font-bold text-slate-300">
+                <Wind size={8} className="mr-0.5" /> {data.humidity}%
               </div>
-            ))
-          )}
+            </div>
+          ))
+        }
+      </section>
+
+      {/* 2. AI 穿著建議卡片 */}
+      <section className="bg-slate-900 rounded-[2rem] p-6 text-white relative overflow-hidden shadow-xl">
+        <div className="absolute top-0 right-0 p-4 opacity-10">
+          <Thermometer size={80} />
+        </div>
+        <div className="relative z-10">
+          <div className="flex items-center space-x-2 mb-3">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">AI Travel Advice</span>
+          </div>
+          <p className="text-sm font-medium leading-relaxed italic text-slate-200">
+            {loading ? "AI 正在分析預報數據中..." : aiAdvice || "根據預報，建議採用層狀穿法（發熱衣+毛衣+防風外套），注意保暖。"}
+          </p>
         </div>
       </section>
 
-      {/* 2. 行程預測區 */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2 px-1 pt-2">
-          <Wifi size={10} className="text-slate-300" />
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">行程日期預覽 (2026)</span>
+      {/* 3. 未來 7 天預報清單 */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center space-x-2">
+            <Wifi size={12} className="text-emerald-500" />
+            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">7-Day Forecast (Tokyo)</h2>
+          </div>
         </div>
 
-        {ITINERARY.map((w, idx) => (
-          <div key={idx} className="bg-white rounded-3xl p-5 border border-slate-100 card-flat relative shadow-sm">
-            <div className="absolute top-4 right-5 text-[10px] font-bold text-slate-300 uppercase">
-              Day {idx + 1}
-            </div>
-
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <div className="flex items-center text-slate-400 mb-0.5">
-                  <MapPin size={10} className="mr-1" />
-                  <span className="text-[10px] font-bold uppercase tracking-tight">{w.title.split('：')[0]}</span>
+        <div className="space-y-2">
+          {loading ? [1,2,3,4,5].map(i => <div key={i} className="h-16 bg-white rounded-2xl animate-pulse border border-slate-50"></div>) : 
+            forecast.map((day, idx) => (
+              <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-red-100 transition-colors">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 text-center">
+                    <p className="text-[10px] font-black text-slate-300 uppercase leading-none">{day.dayName}</p>
+                    <p className="text-xs font-bold text-slate-600 mt-1">{day.date}</p>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-red-50 transition-colors">
+                    {getWeatherIcon(day.weatherCode, 20)}
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">
-                  {w.date.split('-')[1]}/{w.date.split('-')[2]} <span className="text-slate-300 ml-1 font-medium">{w.dayOfWeek}</span>
-                </h3>
+                
+                <div className="flex items-center space-x-3">
+                  <div className="text-right">
+                    <span className="text-sm font-black text-slate-800">{day.maxTemp}°</span>
+                    <span className="text-slate-300 mx-1">/</span>
+                    <span className="text-sm font-bold text-slate-400">{day.minTemp}°</span>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-200" />
+                </div>
               </div>
-              <div className="flex flex-col items-end">
-                {getWeatherIcon(w.weather?.icon || 'sun')}
-                <div className="text-lg font-bold text-slate-800 mt-1">{w.weather?.temp}</div>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl flex items-start border border-slate-50">
-              <CheckCircle2 size={14} className="text-emerald-500 mr-2 mt-0.5 flex-shrink-0" />
-              <p className="text-xs font-medium text-slate-600 leading-relaxed italic">
-                {getStaticSuggestion(w.title)}
-              </p>
-            </div>
-          </div>
-        ))}
-
-        <div className="bg-slate-900 rounded-3xl p-6 text-white card-shadow">
-          <h3 className="font-bold mb-4 flex items-center text-sm uppercase tracking-widest">
-            <Thermometer className="text-red-500 mr-2" size={18} />
-            冬季行李清單
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            {['極暖發熱衣', '防滑雪靴', '羊毛圍巾', '高保濕乳液', '暖暖包', '防風手套'].map(item => (
-              <div key={item} className="text-xs font-bold text-slate-300 flex items-center">
-                <div className="w-1 h-1 bg-red-500 rounded-full mr-2"></div>
-                {item}
-              </div>
-            ))}
-          </div>
+            ))
+          }
         </div>
-      </div>
+      </section>
+
+      {/* Footer Disclaimer */}
+      <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-tighter">
+        Data provided by Open-Meteo & Gemini AI • Real-time Sync
+      </p>
     </div>
   );
 };
