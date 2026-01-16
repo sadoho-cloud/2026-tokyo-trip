@@ -2,33 +2,25 @@
 import React, { useState, useEffect } from 'react';
 import { ITINERARY } from '../constants';
 import { gemini } from '../services/geminiService';
-import { MapPin, Bus, Utensils, Hotel, ShoppingBag, Camera, Sun, Cloud, Snowflake, Droplets, Tag, Star, Bookmark, Loader2, Zap, Edit3, Pin, Check, X, Info } from 'lucide-react';
+import { MapPin, Bus, Utensils, Hotel, ShoppingBag, Camera, Sun, Cloud, Snowflake, Droplets, Bookmark, Loader2, Zap, Edit3, Pin } from 'lucide-react';
 
 const ItineraryView: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [liveWeather, setLiveWeather] = useState<Record<number, any>>({});
   const [loadingWeather, setLoadingWeather] = useState(false);
-  
-  // User reminders state
   const [userReminders, setUserReminders] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempNote, setTempNote] = useState("");
 
   const day = ITINERARY[selectedDay];
 
-  // Load reminders from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('japan_trip_reminders');
     if (saved) {
-      try {
-        setUserReminders(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load reminders", e);
-      }
+      try { setUserReminders(JSON.parse(saved)); } catch (e) { console.error(e); }
     }
   }, []);
 
-  // Save reminders to localStorage when they change
   useEffect(() => {
     localStorage.setItem('japan_trip_reminders', JSON.stringify(userReminders));
   }, [userReminders]);
@@ -36,17 +28,14 @@ const ItineraryView: React.FC = () => {
   useEffect(() => {
     const fetchLiveWeather = async () => {
       if (liveWeather[selectedDay]) return;
-      
       setLoadingWeather(true);
       const searchLoc = day.title.includes('輕井澤') ? 'Karuizawa' : 
                         day.title.includes('橫濱') ? 'Yokohama' : 
                         day.title.includes('台場') ? 'Odaiba Tokyo' : 'Tokyo';
-      
       const advice = await gemini.getWeatherAdvice(day.date, searchLoc);
       setLiveWeather(prev => ({ ...prev, [selectedDay]: advice }));
       setLoadingWeather(false);
     };
-
     fetchLiveWeather();
   }, [selectedDay, day]);
 
@@ -54,11 +43,6 @@ const ItineraryView: React.FC = () => {
     setUserReminders(prev => ({ ...prev, [id]: tempNote }));
     setEditingId(null);
     setTempNote("");
-  };
-
-  const startEditing = (id: string, currentNote: string) => {
-    setEditingId(id);
-    setTempNote(currentNote || "");
   };
 
   const getIcon = (type: string) => {
@@ -71,13 +55,17 @@ const ItineraryView: React.FC = () => {
     }
   };
 
-  const getWeatherIcon = (icon: string, size: number = 24, isActive: boolean = false) => {
-    const colorClass = isActive ? 'text-white' : '';
+  const getWeatherIcon = (icon: string, size: number = 24, active: boolean = false) => {
+    const colorClass = active ? 'text-white' : 
+                      icon === 'sun' ? 'text-amber-400' :
+                      icon === 'snow' ? 'text-blue-300' :
+                      icon === 'rain' ? 'text-blue-400' : 'text-slate-400';
+    
     switch (icon) {
-      case 'snow': return <Snowflake className={colorClass || "text-blue-300"} size={size} />;
-      case 'rain': return <Droplets className={colorClass || "text-blue-400"} size={size} />;
-      case 'cloud': return <Cloud className={colorClass || "text-slate-400"} size={size} />;
-      default: return <Sun className={colorClass || "text-amber-400"} size={size} />;
+      case 'snow': return <Snowflake className={colorClass} size={size} />;
+      case 'rain': return <Droplets className={colorClass} size={size} />;
+      case 'cloud': return <Cloud className={colorClass} size={size} />;
+      default: return <Sun className={colorClass} size={size} />;
     }
   };
 
@@ -87,203 +75,178 @@ const ItineraryView: React.FC = () => {
 
   const currentWeather = liveWeather[selectedDay] || day.weather;
 
+  // 格式化主題文字以適應極窄空間
+  const getDisplayTheme = (fullTitle: string) => {
+    const parts = fullTitle.split('：');
+    const core = parts.length > 1 ? parts[1] : fullTitle;
+    return core.length > 6 ? core.substring(0, 5) + '..' : core;
+  };
+
   return (
-    <div className="flex flex-col min-h-full">
-      {/* Enhanced Horizontal Scroll Header */}
-      <div className="sticky top-0 bg-white/90 backdrop-blur-md z-40 border-b border-slate-100 safe-area-top shadow-sm">
-        <div className="flex overflow-x-auto no-scrollbar p-4 space-x-3">
+    <div className="flex flex-col min-h-screen pb-12">
+      {/* 1. 8 欄位一目了然導覽區 (窄長垂直設計 + 星期幾) */}
+      <div className="sticky top-0 bg-white z-40 border-b border-slate-200 safe-area-top shadow-sm">
+        <div className="grid grid-cols-8 gap-0.5 p-1 h-36">
           {ITINERARY.map((d, idx) => {
             const isSelected = selectedDay === idx;
-            const theme = d.title.split('：')[0];
+            const displayWeather = liveWeather[idx] || d.weather;
             
             return (
               <button
                 key={d.date}
                 onClick={() => setSelectedDay(idx)}
-                className={`flex-shrink-0 flex flex-col items-center justify-between w-20 h-28 p-2 rounded-2xl transition-all border ${
+                className={`flex flex-col items-center justify-start py-2 rounded-lg transition-all relative overflow-hidden ${
                   isSelected 
-                    ? 'bg-red-500 text-white border-red-600 shadow-lg shadow-red-200 scale-105' 
-                    : 'bg-white text-slate-400 border-slate-100'
+                    ? 'bg-red-500 text-white shadow-inner scale-[1.02] z-10' 
+                    : 'bg-white text-slate-400 border border-slate-50 hover:bg-slate-50'
                 }`}
               >
-                <div className="flex flex-col items-center">
-                  <span className={`text-[8px] font-black uppercase tracking-tighter ${isSelected ? 'text-red-100' : 'text-slate-400'}`}>
-                    {d.dayOfWeek}
-                  </span>
-                  <span className="text-lg font-black leading-none">{d.date.split('-')[2]}</span>
-                </div>
-                
-                <div className="my-1">
-                  {getWeatherIcon(d.weather?.icon || 'sun', 20, isSelected)}
-                </div>
-                
-                <span className={`text-[9px] font-bold truncate w-full text-center leading-tight ${isSelected ? 'text-white' : 'text-slate-500'}`}>
-                  {theme}
+                {/* 星期幾 (新增) */}
+                <span className={`text-[7px] font-bold uppercase tracking-tighter mb-0.5 ${isSelected ? 'text-red-100' : 'text-slate-400'}`}>
+                  {d.dayOfWeek}
                 </span>
+
+                {/* 日期數字 */}
+                <span className={`text-[11px] font-black leading-none mb-1 ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                  {d.date.split('-')[2]}
+                </span>
+                
+                {/* 天氣圖示 */}
+                <div className="my-1 flex flex-col items-center">
+                  {getWeatherIcon(displayWeather?.icon || 'sun', 14, isSelected)}
+                  <span className={`text-[7px] font-bold mt-0.5 ${isSelected ? 'text-red-100' : 'text-slate-400'}`}>
+                    {displayWeather?.temp.split('/')[0]}
+                  </span>
+                </div>
+
+                {/* 主題文字 - 垂直排列 */}
+                <div className={`mt-auto flex flex-col items-center justify-end w-full px-0.5 pb-1`}>
+                  <p className={`text-[9px] font-bold leading-[1.1] text-center break-words ${isSelected ? 'text-white' : 'text-slate-600'}`} style={{ writingMode: 'vertical-lr' }}>
+                    {getDisplayTheme(d.title)}
+                  </p>
+                </div>
+                
+                {isSelected && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-white opacity-30"></div>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="p-6">
-        {/* Day Header with Weather Detail */}
-        <div className="flex justify-between items-start mb-6 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
-          <div className="relative z-10 max-w-[70%]">
-            <h2 className="text-2xl font-black text-slate-900 leading-tight">{day.title}</h2>
-            <p className="text-slate-500 font-medium text-sm mt-1">2026 年 {day.date.split('-')[1]}月{day.date.split('-')[2]}日</p>
+      <div className="p-4 space-y-4">
+        {/* 2. 當日詳情標題卡 */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 card-flat flex justify-between items-center shadow-sm">
+          <div className="flex-grow pr-4">
+            <div className="flex items-center space-x-2 mb-1">
+              <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider">Day {selectedDay + 1}</span>
+              <span className="text-[10px] font-bold text-slate-400">{day.date} ({day.dayOfWeek})</span>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 leading-tight">{day.title}</h2>
           </div>
           
-          <div className="flex flex-col items-end relative z-10">
+          <div className="flex flex-col items-end border-l border-slate-100 pl-4 min-w-[80px]">
             {loadingWeather ? (
-              <div className="flex flex-col items-end">
-                <Loader2 className="animate-spin text-slate-300" size={24} />
-                <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-tighter">Searching...</span>
-              </div>
+              <Loader2 className="animate-spin text-slate-200" size={20} />
             ) : (
-              <>
-                {getWeatherIcon(currentWeather?.icon)}
-                <span className="text-xs font-bold text-slate-600 mt-1">{currentWeather?.temp}</span>
-                <div className="flex items-center">
-                  <span className="text-[10px] text-slate-400 mr-1">{currentWeather?.condition}</span>
-                  <div className="flex items-center px-1 bg-red-100 rounded text-[8px] font-black text-red-500 animate-pulse">
-                    <Zap size={6} className="mr-0.5 fill-red-500" />
-                    LIVE
-                  </div>
-                </div>
-              </>
+              <div className="flex flex-col items-center">
+                {getWeatherIcon(currentWeather?.icon, 28, false)}
+                <span className="text-sm font-bold text-slate-800 mt-1">{currentWeather?.temp}</span>
+                <span className="text-[9px] font-bold text-slate-400 mt-0.5">{currentWeather?.condition}</span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Live Advice Alert */}
+        {/* AI 穿著建議 */}
         {!loadingWeather && currentWeather?.suggestion && (
-          <div className="mb-6 bg-slate-900 text-white p-4 rounded-2xl shadow-lg border border-slate-800 flex items-start">
-            <div className="mr-3 mt-1 bg-red-500 p-1.5 rounded-xl">
-              <Zap size={14} className="fill-white" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">AI 穿搭與交通建議</p>
-              <p className="text-xs font-medium text-slate-200 leading-relaxed">{currentWeather.suggestion}</p>
-            </div>
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-start">
+            <Zap size={14} className="text-amber-500 mr-2 mt-0.5 shrink-0 fill-amber-500" />
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              <span className="font-bold text-slate-800">穿著建議：</span>{currentWeather.suggestion}
+            </p>
           </div>
         )}
 
-        {/* Timeline */}
-        <div className="relative">
-          <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
-
-          <div className="space-y-8">
+        {/* 3. 行程軸內容 */}
+        <div className="relative pl-1 pt-2">
+          <div className="absolute left-[17px] top-6 bottom-6 w-px bg-slate-200"></div>
+          <div className="space-y-6">
             {day.events.map((event) => {
               const userNote = userReminders[event.id];
               const isEditing = editingId === event.id;
 
               return (
-                <div key={event.id} className="relative z-10 flex flex-col">
-                  <div className="flex">
-                    <div className="flex-shrink-0 w-10 flex flex-col items-center pt-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-sm ${
-                        event.type === 'transport' ? 'bg-blue-50' : 
-                        event.type === 'meal' ? 'bg-orange-50' : 
-                        event.type === 'shopping' ? 'bg-pink-50' : 'bg-slate-50'
-                      }`}>
-                        {getIcon(event.type)}
-                      </div>
+                <div key={event.id} className="relative z-10 flex">
+                  <div className="flex-shrink-0 w-9 flex flex-col items-center pt-1">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-slate-200 shadow-sm">
+                      {getIcon(event.type)}
                     </div>
+                  </div>
 
-                    <div className="ml-4 flex-grow relative">
-                      <div 
-                        onClick={() => openGoogleMaps(event.location)}
-                        className={`p-5 rounded-3xl shadow-sm border transition-all active:scale-[0.98] ${
-                          event.type === 'meal' ? 'bg-orange-50/30 border-orange-100' :
-                          event.type === 'transport' ? 'bg-blue-50/30 border-blue-100' :
-                          event.type === 'shopping' ? 'bg-pink-50/30 border-pink-100' :
-                          'bg-white border-slate-100'
-                        }`}
+                  <div className="ml-4 flex-grow">
+                    <div className={`p-4 rounded-2xl border transition-all bg-white shadow-sm relative ${
+                      isEditing ? 'border-blue-500 ring-2 ring-blue-50' : 'border-slate-100'
+                    }`}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[11px] font-bold text-slate-400">{event.time}</span>
+                        {event.bookingCode && (
+                          <span className="bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center">
+                            <Bookmark size={8} className="mr-1" /> {event.bookingCode}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <h3 className="font-bold text-slate-800 text-base leading-snug mb-2">{event.activity}</h3>
+                      
+                      <div className="flex items-center text-slate-500 text-[11px] mb-3" onClick={() => openGoogleMaps(event.location)}>
+                        <MapPin size={10} className="mr-1 text-slate-400" />
+                        <span className="truncate border-b border-slate-200 pb-0.5">{event.location}</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {event.highlights && event.highlights.map((h, i) => (
+                          <div key={i} className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            h.type === 'food' ? 'bg-red-50 text-red-600 border border-red-100' :
+                            h.type === 'souvenir' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                            'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}>
+                            {h.text}
+                          </div>
+                        ))}
+
+                        {userNote && !isEditing && (
+                          <div className="flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white shadow-sm">
+                            <Pin size={8} className="mr-1 fill-white" />
+                            提醒: {userNote}
+                          </div>
+                        )}
+                      </div>
+
+                      <button 
+                        onClick={() => { setEditingId(event.id); setTempNote(userNote || ""); }}
+                        className={`absolute top-3 right-3 p-1.5 rounded-lg transition-colors ${userNote ? 'text-blue-500 bg-blue-50' : 'text-slate-300 hover:text-slate-400'}`}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs font-black text-slate-400">{event.time}</span>
-                          {event.bookingCode && (
-                            <span className="flex items-center text-[10px] font-black bg-slate-900 text-white px-2 py-0.5 rounded-full">
-                              <Bookmark size={10} className="mr-1" />
-                              預約: {event.bookingCode}
-                            </span>
-                          )}
-                        </div>
-                        
-                        <h3 className="font-bold text-slate-800 text-lg leading-tight mb-2">{event.activity}</h3>
-                        
-                        <div className="flex items-center text-slate-400 text-xs mb-3">
-                          <MapPin size={12} className="mr-1" />
-                          <span className="truncate">{event.location}</span>
-                        </div>
-
-                        {/* Combined Highlights and User Reminders */}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {/* Default Trip Highlights */}
-                          {event.highlights && event.highlights.map((h, i) => (
-                            <div key={i} className={`flex items-center px-2 py-1 rounded-lg text-[10px] font-bold ${
-                              h.type === 'food' ? 'bg-red-500 text-white' :
-                              h.type === 'menu' ? 'bg-amber-100 text-amber-700' :
-                              h.type === 'souvenir' ? 'bg-purple-100 text-purple-700' :
-                              'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {h.type === 'food' && <Star size={10} className="mr-1 fill-white" />}
-                              {h.type === 'souvenir' && <Tag size={10} className="mr-1" />}
-                              {h.type === 'food' ? '必吃: ' : h.type === 'menu' ? '必點: ' : h.type === 'souvenir' ? '必買: ' : '攻略: '}
-                              {h.text}
-                            </div>
-                          ))}
-
-                          {/* Display User Reminder as a High-Visibility Tag - Refined Style */}
-                          {userNote && !isEditing && (
-                            <div className="flex items-center px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-600 text-white shadow-sm animate-in fade-in zoom-in duration-300">
-                              <Pin size={10} className="mr-1 fill-white rotate-[30deg]" />
-                              提醒: {userNote}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Add/Edit Reminder Button */}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); startEditing(event.id, userNote); }}
-                          className={`absolute bottom-4 right-4 p-2 rounded-xl transition-all ${userNote ? 'bg-indigo-50 text-indigo-500 shadow-inner' : 'bg-slate-100 text-slate-500'}`}
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                      </div>
-
-                      {/* Reminder Editor Overlay */}
-                      {isEditing && (
-                        <div className="mt-2 ml-2 bg-white border-2 border-indigo-500 p-4 rounded-2xl shadow-xl z-20">
-                          <div className="flex items-center mb-2">
-                            <Info size={12} className="text-indigo-500 mr-2" />
-                            <p className="text-[10px] font-black text-slate-400 uppercase">設定自訂提醒事項</p>
-                          </div>
-                          <textarea
-                            autoFocus
-                            value={tempNote}
-                            onChange={(e) => setTempNote(e.target.value)}
-                            className="w-full text-sm font-medium border-0 focus:ring-0 bg-slate-50 rounded-xl p-3 h-16 mb-3"
-                            placeholder="輸入內容（例如：代購清單、寄物櫃號碼）"
-                          />
-                          <div className="flex space-x-2">
-                            <button 
-                              onClick={() => handleSaveReminder(event.id)}
-                              className="flex-grow bg-indigo-600 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center shadow-md shadow-indigo-100"
-                            >
-                              <Check size={14} className="mr-1" /> 確認儲存
-                            </button>
-                            <button 
-                              onClick={() => { setEditingId(null); setTempNote(""); }}
-                              className="px-4 bg-slate-100 text-slate-500 font-bold text-xs py-2 rounded-xl flex items-center justify-center"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                        <Edit3 size={14} />
+                      </button>
                     </div>
+
+                    {isEditing && (
+                      <div className="mt-2 bg-white border border-blue-400 p-3 rounded-xl shadow-lg z-50">
+                        <textarea
+                          autoFocus
+                          value={tempNote}
+                          onChange={(e) => setTempNote(e.target.value)}
+                          className="w-full text-sm border-0 focus:ring-0 bg-slate-50 rounded-lg p-3 h-16 mb-2"
+                          placeholder="記下重要事項..."
+                        />
+                        <div className="flex space-x-2">
+                          <button onClick={() => handleSaveReminder(event.id)} className="flex-grow bg-blue-600 text-white font-bold text-xs py-2 rounded-lg">儲存</button>
+                          <button onClick={() => setEditingId(null)} className="px-4 bg-slate-100 text-slate-500 font-bold text-xs py-2 rounded-lg">取消</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

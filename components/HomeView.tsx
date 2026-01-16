@@ -14,24 +14,17 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
   useEffect(() => {
     const calculateCountdown = () => {
       const now = new Date();
-      // Reset hours to compare dates only
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const start = new Date(TRIP_START_DATE);
       const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
       
       const diffTime = startDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysLeft(diffDays > 0 ? diffDays : 0);
+      setDaysLeft(Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))));
 
-      // Determine which day of the itinerary we are on
       const dayDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (dayDiff < 0) {
-        setCurrentDayIndex(0); // Before trip
-      } else if (dayDiff >= ITINERARY.length) {
-        setCurrentDayIndex(ITINERARY.length - 1); // After trip
-      } else {
-        setCurrentDayIndex(dayDiff);
-      }
+      if (dayDiff < 0) setCurrentDayIndex(0);
+      else if (dayDiff >= ITINERARY.length) setCurrentDayIndex(ITINERARY.length - 1);
+      else setCurrentDayIndex(dayDiff);
     };
 
     calculateCountdown();
@@ -39,148 +32,85 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const todayStr = new Date().toLocaleDateString('zh-TW', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long'
-  });
-
   const currentPlan = ITINERARY[currentDayIndex];
   const isTripStarted = daysLeft === 0;
 
-  const openInGoogleMaps = (loc: string) => {
-    window.location.href = `comgooglemaps://?q=${encodeURIComponent(loc)}`;
-    setTimeout(() => {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`, '_blank');
-    }, 500);
-  };
-
   return (
-    <div className="p-6">
-      <header className="mb-8">
-        <h1 className="text-3xl font-black text-slate-900 mb-2">2026 日本行</h1>
-        <p className="text-slate-500 font-medium">{todayStr}</p>
+    <div className="p-5 space-y-6">
+      <header className="pt-2">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">2026 日本旅程</h1>
+        <p className="text-slate-500 text-sm font-medium">01.24 - 01.31 東京・輕井澤</p>
       </header>
 
-      {/* Countdown Card */}
-      <div className="bg-gradient-to-br from-red-500 to-rose-600 rounded-3xl p-8 text-white shadow-xl shadow-red-200 mb-8 overflow-hidden relative">
+      {/* 倒數區塊 - 乾淨白底 */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 card-flat relative overflow-hidden">
         <div className="relative z-10">
-          <p className="text-red-100 font-medium mb-1">{isTripStarted ? '旅程進行中' : '距離出發還有'}</p>
-          <div className="flex items-baseline">
-            <span className="text-6xl font-black">{isTripStarted ? `Day ${currentDayIndex + 1}` : daysLeft}</span>
-            <span className="text-2xl font-bold ml-2">{isTripStarted ? '' : '天'}</span>
-          </div>
-          <p className="mt-4 text-red-50 font-semibold flex items-center bg-white/20 backdrop-blur-sm w-fit px-3 py-1 rounded-full text-xs">
-             2026.01.24 - 01.31
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
+            {isTripStarted ? '旅程狀態' : '倒數出發'}
           </p>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-5xl font-bold text-red-500">{isTripStarted ? `Day ${currentDayIndex + 1}` : daysLeft}</span>
+            <span className="text-slate-400 font-bold text-lg">{isTripStarted ? '/ 8' : 'DAYS'}</span>
+          </div>
         </div>
-        <div className="absolute top-0 right-0 -mr-12 -mt-12 opacity-10">
-           <Zap size={200} />
-        </div>
+        <Zap className="absolute right-[-20px] bottom-[-20px] text-red-500 opacity-[0.03]" size={160} />
       </div>
 
-      <h2 className="text-lg font-bold mb-4 text-slate-800">快速導覽</h2>
+      {/* 功能入口 - 高對比圖示 */}
       <div className="grid grid-cols-2 gap-4">
-        <button 
-          onClick={() => onNavigate('itinerary')}
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-start hover:bg-slate-50 transition-colors"
-        >
-          <div className="bg-blue-50 p-3 rounded-xl mb-3">
-            <Calendar className="text-blue-500" size={24} />
-          </div>
-          <span className="font-bold text-slate-800">每日行程表</span>
-          <span className="text-xs text-slate-400 mt-1">Day {currentDayIndex + 1} 進行中</span>
-        </button>
-
-        <button 
-          onClick={() => onNavigate('weather')}
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-start hover:bg-slate-50 transition-colors"
-        >
-          <div className="bg-amber-50 p-3 rounded-xl mb-3">
-            <Wind className="text-amber-500" size={24} />
-          </div>
-          <span className="font-bold text-slate-800">天氣與穿著</span>
-          <span className="text-xs text-slate-400 mt-1">地點同步更新</span>
-        </button>
-
-        <button 
-          onClick={() => onNavigate('map')}
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-start hover:bg-slate-50 transition-colors"
-        >
-          <div className="bg-emerald-50 p-3 rounded-xl mb-3">
-            <MapPin className="text-emerald-500" size={24} />
-          </div>
-          <span className="font-bold text-slate-800">地點導航</span>
-          <span className="text-xs text-slate-400 mt-1">共 {ITINERARY.reduce((acc, d) => acc + d.events.length, 0)} 個座標</span>
-        </button>
-
-        <button 
-          onClick={() => onNavigate('ai')}
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-start hover:bg-slate-50 transition-colors"
-        >
-          <div className="bg-purple-50 p-3 rounded-xl mb-3">
-            <MessageSquare className="text-purple-500" size={24} />
-          </div>
-          <span className="font-bold text-slate-800">旅伴 AI</span>
-          <span className="text-xs text-slate-400 mt-1">隨時問旅遊資訊</span>
-        </button>
+        {[
+          { id: 'itinerary', label: '每日行程', icon: Calendar, color: 'text-blue-500', bg: 'bg-blue-50' },
+          { id: 'weather', label: '天氣建議', icon: Wind, color: 'text-amber-500', bg: 'bg-amber-50' },
+          { id: 'map', label: '地點導航', icon: MapPin, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+          { id: 'ai', label: '旅行 AI', icon: MessageSquare, color: 'text-purple-500', bg: 'bg-purple-50' }
+        ].map((item) => (
+          <button 
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
+            className="bg-white p-4 rounded-xl border border-slate-200 card-flat flex flex-col items-start active:bg-slate-50 transition-colors"
+          >
+            <div className={`${item.bg} p-2 rounded-lg mb-3`}>
+              <item.icon className={item.color} size={22} />
+            </div>
+            <span className="font-bold text-slate-800 text-sm">{item.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Today Preview - Fully Linked to Itinerary Locations */}
-      <div className="mt-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-slate-800">
-            {isTripStarted ? '今日行程亮點' : `Day ${currentDayIndex + 1} 搶先看`}
+      {/* 今日預覽 */}
+      <section className="space-y-3">
+        <div className="flex justify-between items-center px-1">
+          <h2 className="font-bold text-slate-800 text-xs uppercase tracking-widest">
+            {isTripStarted ? '今日亮點' : '行程搶先看'}
           </h2>
           <button onClick={() => onNavigate('itinerary')} className="text-red-500 text-xs font-bold flex items-center">
-            完整行程 <ChevronRight size={14} />
+            完整列表 <ChevronRight size={14} />
           </button>
         </div>
         
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-           <div className="flex items-center mb-4 pb-4 border-b border-slate-50">
-              <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 mr-4 flex-shrink-0">
-                <img 
-                  src={`https://picsum.photos/seed/${currentPlan.title}/200/200`} 
-                  alt="Destination" 
-                  className="w-full h-full object-cover" 
-                />
-              </div>
-              <div className="flex-grow">
-                <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">
-                  {currentPlan.date.split('-')[1]}/{currentPlan.date.split('-')[2]} {currentPlan.dayOfWeek}
-                </p>
-                <h3 className="font-black text-slate-900 text-lg leading-tight">{currentPlan.title}</h3>
-              </div>
-           </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 card-flat">
+          <div className="flex items-center mb-4 pb-4 border-b border-slate-50">
+            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 mr-4 flex-shrink-0">
+              <img src={`https://picsum.photos/seed/${currentPlan.title}/200/200`} alt="Theme" className="w-full h-full object-cover" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-red-500 uppercase">{currentPlan.date} ({currentPlan.dayOfWeek})</p>
+              <h3 className="font-bold text-slate-800 text-sm leading-tight">{currentPlan.title}</h3>
+            </div>
+          </div>
 
-           <div className="space-y-4">
-              {currentPlan.events.slice(0, 3).map((event) => (
-                <div 
-                  key={event.id} 
-                  onClick={() => openInGoogleMaps(event.location)}
-                  className="flex items-start group active:opacity-60 transition-all cursor-pointer"
-                >
-                  <div className="text-[10px] font-black text-slate-400 w-10 pt-1">{event.time}</div>
-                  <div className="flex-grow ml-2">
-                    <p className="font-bold text-slate-800 text-sm group-hover:text-red-500 transition-colors">{event.activity}</p>
-                    <div className="flex items-center text-slate-400 text-[10px] mt-0.5">
-                      <MapPin size={8} className="mr-1" />
-                      <span className="truncate max-w-[150px]">{event.location}</span>
-                    </div>
-                  </div>
-                  <Navigation size={14} className="text-slate-200 mt-1" />
+          <div className="space-y-3">
+            {currentPlan.events.slice(0, 2).map((event) => (
+              <div key={event.id} className="flex items-start">
+                <div className="text-[10px] font-bold text-slate-400 w-10 pt-1">{event.time}</div>
+                <div className="flex-grow ml-2">
+                  <p className="font-bold text-slate-800 text-xs leading-tight">{event.activity}</p>
                 </div>
-              ))}
-              {currentPlan.events.length > 3 && (
-                <p className="text-center text-xs font-bold text-slate-300 pt-2 italic">
-                  查看剩餘 {currentPlan.events.length - 3} 個行程...
-                </p>
-              )}
-           </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
