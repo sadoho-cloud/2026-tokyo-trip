@@ -1,0 +1,7 @@
+{
+  "name": "Japan 2026 Journey",
+  "description": "A comprehensive travel companion for your Japan trip (Jan 24-31, 2026), featuring itineraries, weather forecasts, and AI-powered travel assistance.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
