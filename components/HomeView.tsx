@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TRIP_START_DATE, ITINERARY } from '../constants';
-import { Calendar, MapPin, Wind, Zap, MessageSquare, ChevronRight, Navigation } from 'lucide-react';
+import { Calendar, MapPin, Wind, ListChecks, ChevronRight, Zap } from 'lucide-react';
 
 interface HomeViewProps {
   onNavigate: (view: string) => void;
@@ -28,8 +28,6 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     };
 
     calculateCountdown();
-    const interval = setInterval(calculateCountdown, 3600000);
-    return () => clearInterval(interval);
   }, []);
 
   const currentPlan = ITINERARY[currentDayIndex];
@@ -42,7 +40,6 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
         <p className="text-slate-500 text-sm font-medium">01.24 - 01.31 東京・輕井澤</p>
       </header>
 
-      {/* 倒數區塊 - 乾淨白底 */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 card-flat relative overflow-hidden">
         <div className="relative z-10">
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
@@ -56,13 +53,12 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
         <Zap className="absolute right-[-20px] bottom-[-20px] text-red-500 opacity-[0.03]" size={160} />
       </div>
 
-      {/* 功能入口 - 高對比圖示 */}
       <div className="grid grid-cols-2 gap-4">
         {[
           { id: 'itinerary', label: '每日行程', icon: Calendar, color: 'text-blue-500', bg: 'bg-blue-50' },
-          { id: 'weather', label: '天氣建議', icon: Wind, color: 'text-amber-500', bg: 'bg-amber-50' },
+          { id: 'weather', label: '氣溫預覽', icon: Wind, color: 'text-amber-500', bg: 'bg-amber-50' },
           { id: 'map', label: '地點導航', icon: MapPin, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-          { id: 'ai', label: '旅行 AI', icon: MessageSquare, color: 'text-purple-500', bg: 'bg-purple-50' }
+          { id: 'alt', label: '備忘清單', icon: ListChecks, color: 'text-purple-500', bg: 'bg-purple-50' }
         ].map((item) => (
           <button 
             key={item.id}
@@ -77,11 +73,10 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* 今日預覽 */}
       <section className="space-y-3">
         <div className="flex justify-between items-center px-1">
           <h2 className="font-bold text-slate-800 text-xs uppercase tracking-widest">
-            {isTripStarted ? '今日亮點' : '行程搶先看'}
+            {isTripStarted ? '今日重點' : '行程摘要'}
           </h2>
           <button onClick={() => onNavigate('itinerary')} className="text-red-500 text-xs font-bold flex items-center">
             完整列表 <ChevronRight size={14} />
@@ -100,7 +95,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           </div>
 
           <div className="space-y-3">
-            {currentPlan.events.slice(0, 2).map((event) => (
+            {currentPlan.events.slice(0, 3).map((event) => (
               <div key={event.id} className="flex items-start">
                 <div className="text-[10px] font-bold text-slate-400 w-10 pt-1">{event.time}</div>
                 <div className="flex-grow ml-2">

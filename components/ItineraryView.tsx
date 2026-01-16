@@ -1,13 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { ITINERARY } from '../constants';
-import { gemini } from '../services/geminiService';
-import { MapPin, Bus, Utensils, Hotel, ShoppingBag, Camera, Sun, Cloud, Snowflake, Droplets, Bookmark, Loader2, Zap, Edit3, Pin } from 'lucide-react';
+import { MapPin, Bus, Utensils, Hotel, ShoppingBag, Camera, Sun, Cloud, Snowflake, Droplets, Bookmark, Edit3, Pin } from 'lucide-react';
 
 const ItineraryView: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState(0);
-  const [liveWeather, setLiveWeather] = useState<Record<number, any>>({});
-  const [loadingWeather, setLoadingWeather] = useState(false);
   const [userReminders, setUserReminders] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempNote, setTempNote] = useState("");
@@ -24,20 +21,6 @@ const ItineraryView: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('japan_trip_reminders', JSON.stringify(userReminders));
   }, [userReminders]);
-
-  useEffect(() => {
-    const fetchLiveWeather = async () => {
-      if (liveWeather[selectedDay]) return;
-      setLoadingWeather(true);
-      const searchLoc = day.title.includes('輕井澤') ? 'Karuizawa' : 
-                        day.title.includes('橫濱') ? 'Yokohama' : 
-                        day.title.includes('台場') ? 'Odaiba Tokyo' : 'Tokyo';
-      const advice = await gemini.getWeatherAdvice(day.date, searchLoc);
-      setLiveWeather(prev => ({ ...prev, [selectedDay]: advice }));
-      setLoadingWeather(false);
-    };
-    fetchLiveWeather();
-  }, [selectedDay, day]);
 
   const handleSaveReminder = (id: string) => {
     setUserReminders(prev => ({ ...prev, [id]: tempNote }));
@@ -73,9 +56,6 @@ const ItineraryView: React.FC = () => {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
   };
 
-  const currentWeather = liveWeather[selectedDay] || day.weather;
-
-  // 格式化主題文字以適應極窄空間
   const getDisplayTheme = (fullTitle: string) => {
     const parts = fullTitle.split('：');
     const core = parts.length > 1 ? parts[1] : fullTitle;
@@ -84,12 +64,12 @@ const ItineraryView: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen pb-12">
-      {/* 1. 8 欄位一目了然導覽區 (窄長垂直設計 + 星期幾) */}
+      {/* 1. 8 欄位導覽區 (窄長垂直設計) */}
       <div className="sticky top-0 bg-white z-40 border-b border-slate-200 safe-area-top shadow-sm">
         <div className="grid grid-cols-8 gap-0.5 p-1 h-36">
           {ITINERARY.map((d, idx) => {
             const isSelected = selectedDay === idx;
-            const displayWeather = liveWeather[idx] || d.weather;
+            const displayWeather = d.weather;
             
             return (
               <button
@@ -101,17 +81,14 @@ const ItineraryView: React.FC = () => {
                     : 'bg-white text-slate-400 border border-slate-50 hover:bg-slate-50'
                 }`}
               >
-                {/* 星期幾 (新增) */}
                 <span className={`text-[7px] font-bold uppercase tracking-tighter mb-0.5 ${isSelected ? 'text-red-100' : 'text-slate-400'}`}>
                   {d.dayOfWeek}
                 </span>
 
-                {/* 日期數字 */}
                 <span className={`text-[11px] font-black leading-none mb-1 ${isSelected ? 'text-white' : 'text-slate-900'}`}>
                   {d.date.split('-')[2]}
                 </span>
                 
-                {/* 天氣圖示 */}
                 <div className="my-1 flex flex-col items-center">
                   {getWeatherIcon(displayWeather?.icon || 'sun', 14, isSelected)}
                   <span className={`text-[7px] font-bold mt-0.5 ${isSelected ? 'text-red-100' : 'text-slate-400'}`}>
@@ -119,7 +96,6 @@ const ItineraryView: React.FC = () => {
                   </span>
                 </div>
 
-                {/* 主題文字 - 垂直排列 */}
                 <div className={`mt-auto flex flex-col items-center justify-end w-full px-0.5 pb-1`}>
                   <p className={`text-[9px] font-bold leading-[1.1] text-center break-words ${isSelected ? 'text-white' : 'text-slate-600'}`} style={{ writingMode: 'vertical-lr' }}>
                     {getDisplayTheme(d.title)}
@@ -147,27 +123,13 @@ const ItineraryView: React.FC = () => {
           </div>
           
           <div className="flex flex-col items-end border-l border-slate-100 pl-4 min-w-[80px]">
-            {loadingWeather ? (
-              <Loader2 className="animate-spin text-slate-200" size={20} />
-            ) : (
-              <div className="flex flex-col items-center">
-                {getWeatherIcon(currentWeather?.icon, 28, false)}
-                <span className="text-sm font-bold text-slate-800 mt-1">{currentWeather?.temp}</span>
-                <span className="text-[9px] font-bold text-slate-400 mt-0.5">{currentWeather?.condition}</span>
-              </div>
-            )}
+            <div className="flex flex-col items-center">
+              {getWeatherIcon(day.weather?.icon || 'sun', 28, false)}
+              <span className="text-sm font-bold text-slate-800 mt-1">{day.weather?.temp}</span>
+              <span className="text-[9px] font-bold text-slate-400 mt-0.5">{day.weather?.condition}</span>
+            </div>
           </div>
         </div>
-
-        {/* AI 穿著建議 */}
-        {!loadingWeather && currentWeather?.suggestion && (
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-start">
-            <Zap size={14} className="text-amber-500 mr-2 mt-0.5 shrink-0 fill-amber-500" />
-            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              <span className="font-bold text-slate-800">穿著建議：</span>{currentWeather.suggestion}
-            </p>
-          </div>
-        )}
 
         {/* 3. 行程軸內容 */}
         <div className="relative pl-1 pt-2">

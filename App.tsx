@@ -1,12 +1,11 @@
 
 import React, { useState } from 'react';
-import { Home, Calendar, MapPin, CloudSun, List, MessageSquare, Briefcase } from 'lucide-react';
+import { Home, Calendar, MapPin, Briefcase, ListChecks } from 'lucide-react';
 import HomeView from './components/HomeView';
 import ItineraryView from './components/ItineraryView';
 import MapView from './components/MapView';
 import WeatherView from './components/WeatherView';
 import AltPlansView from './components/AltPlansView';
-import AIChatView from './components/AIChatView';
 import ToolsView from './components/ToolsView';
 
 enum View {
@@ -15,7 +14,6 @@ enum View {
   MAP = 'map',
   WEATHER = 'weather',
   ALT = 'alt',
-  AI = 'ai',
   TOOLS = 'tools'
 }
 
@@ -29,7 +27,6 @@ const App: React.FC = () => {
       case View.MAP: return <MapView />;
       case View.WEATHER: return <WeatherView />;
       case View.ALT: return <AltPlansView />;
-      case View.AI: return <AIChatView />;
       case View.TOOLS: return <ToolsView />;
       default: return <HomeView onNavigate={(v: string) => setActiveView(v as View)} />;
     }
@@ -45,19 +42,23 @@ const App: React.FC = () => {
         <div className="flex justify-around items-center h-16">
           <button onClick={() => setActiveView(View.HOME)} className={`flex flex-col items-center justify-center w-full h-full ${activeView === View.HOME ? 'text-red-500' : 'text-slate-400'}`}>
             <Home size={20} />
-            <span className="text-[10px] mt-1 font-medium">總覽</span>
+            <span className="text-[10px] mt-1 font-medium">首頁</span>
           </button>
           <button onClick={() => setActiveView(View.ITINERARY)} className={`flex flex-col items-center justify-center w-full h-full ${activeView === View.ITINERARY ? 'text-red-500' : 'text-slate-400'}`}>
             <Calendar size={20} />
             <span className="text-[10px] mt-1 font-medium">行程</span>
           </button>
-          <button onClick={() => setActiveView(View.AI)} className={`flex flex-col items-center justify-center w-full h-full ${activeView === View.AI ? 'text-red-500' : 'text-slate-400'}`}>
-            <MessageSquare size={20} />
-            <span className="text-[10px] mt-1 font-medium">問 AI</span>
+          <button onClick={() => setActiveView(View.MAP)} className={`flex flex-col items-center justify-center w-full h-full ${activeView === View.MAP ? 'text-red-500' : 'text-slate-400'}`}>
+            <MapPin size={20} />
+            <span className="text-[10px] mt-1 font-medium">地圖</span>
+          </button>
+          <button onClick={() => setActiveView(View.ALT)} className={`flex flex-col items-center justify-center w-full h-full ${activeView === View.ALT ? 'text-red-500' : 'text-slate-400'}`}>
+            <ListChecks size={20} />
+            <span className="text-[10px] mt-1 font-medium">備忘</span>
           </button>
           <button onClick={() => setActiveView(View.TOOLS)} className={`flex flex-col items-center justify-center w-full h-full ${activeView === View.TOOLS ? 'text-red-500' : 'text-slate-400'}`}>
             <Briefcase size={20} />
-            <span className="text-[10px] mt-1 font-medium">工具箱</span>
+            <span className="text-[10px] mt-1 font-medium">工具</span>
           </button>
         </div>
       </nav>

@@ -4,6 +4,12 @@ import { DayPlan } from './types';
 export const TRIP_START_DATE = '2026-01-24';
 export const TRIP_END_DATE = '2026-01-31';
 
+export const CITY_COORDS = {
+  tokyo: { lat: 35.6895, lon: 139.6917, name: '東京' },
+  yokohama: { lat: 35.4437, lon: 139.6380, name: '橫濱' },
+  karuizawa: { lat: 36.3488, lon: 138.6358, name: '輕井澤' }
+};
+
 export const FLIGHT_INFO = {
   departure: {
     flight: 'CI221',
